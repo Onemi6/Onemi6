@@ -6,14 +6,17 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.Window;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.onemi6.app.R;
+import com.onemi6.app.model.Onemi6DB;
 import com.onemi6.app.service.AutoUpdateService;
 import com.onemi6.app.util.HttpCallbackListener;
 import com.onemi6.app.util.HttpUtil;
@@ -21,6 +24,7 @@ import com.onemi6.app.util.Utility;
 
 public class WeatherActivity extends Activity implements OnClickListener {
 
+	private long mExitTime;
 	private LinearLayout weatherInfoLayout;
 	/** * 用于显示城市名 */
 	private TextView cityNameText;
@@ -38,10 +42,21 @@ public class WeatherActivity extends Activity implements OnClickListener {
 	private Button switchCity;
 	/** * 更新天气按钮 */
 	private Button refreshWeather;
+	private Onemi6DB onemi6DB;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		onemi6DB = Onemi6DB.getInstance(this);
+		SharedPreferences prefs = PreferenceManager
+				.getDefaultSharedPreferences(this);
+		// 没有选择城市，跳转到 ChooseAreaActivity
+		if (!prefs.getBoolean("city_selected", false)) {
+			Intent intent = new Intent(this, ChooseAreaActivity.class);
+			startActivity(intent);
+			finish();
+			return;
+		}
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.weather_layout);
 		// 初始化各控件
@@ -63,7 +78,16 @@ public class WeatherActivity extends Activity implements OnClickListener {
 			queryWeatherCode(countyCode);
 		} else {
 			// 没有县级代号时就直接显示本地天气
-			showWeather();
+			String city_code=prefs.getString("city_code", "");
+			if(onemi6DB.selectCounty(city_code)){
+				showWeather();
+			}else {
+				publishText.setText("同步中...");
+				weatherInfoLayout.setVisibility(View.INVISIBLE);
+				cityNameText.setVisibility(View.INVISIBLE);
+				countyCode=onemi6DB.loadCountyList().get(0).getCountyCode();
+				queryWeatherCode(countyCode);
+			}
 		}
 		switchCity.setOnClickListener(this);
 		refreshWeather.setOnClickListener(this);
@@ -73,8 +97,8 @@ public class WeatherActivity extends Activity implements OnClickListener {
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.switch_city:
-			Intent intent = new Intent(this, ChooseAreaActivity.class);
-			intent.putExtra("from_weather_activity", true);
+			Intent intent = new Intent(this, CountyListActivity.class);
+			// intent.putExtra("from_weather_activity", true);
 			startActivity(intent);
 			finish();
 			break;
@@ -96,18 +120,18 @@ public class WeatherActivity extends Activity implements OnClickListener {
 	private void queryWeatherCode(String countyCode) {
 		String address = "http://www.weather.com.cn/data/list3/city"
 				+ countyCode + ".xml";
-		queryFromServer(address, "countyCode");
+		queryFromServer(address, "countyCode",countyCode);
 	}
 
 	/** * 查询天气代号所对应的天气。 */
 	private void queryWeatherInfo(String weatherCode) {
 		String address = "http://www.weather.com.cn/data/cityinfo/"
 				+ weatherCode + ".html";
-		queryFromServer(address, "weatherCode");
+		queryFromServer(address, "weatherCode",weatherCode);
 	}
 
 	/** * 根据传入的地址和类型去向服务器查询天气代号或者天气信息。 */
-	private void queryFromServer(final String address, final String type) {
+	private void queryFromServer(final String address, final String type,final String code) {
 		HttpUtil.sendHttpRequest(address, new HttpCallbackListener() {
 			@Override
 			public void onFinish(final String response) {
@@ -119,6 +143,9 @@ public class WeatherActivity extends Activity implements OnClickListener {
 							String weatherCode = array[1];
 							queryWeatherInfo(weatherCode);
 						}
+						SharedPreferences.Editor editor = PreferenceManager
+								.getDefaultSharedPreferences(WeatherActivity.this).edit();
+						editor.putString("city_code", code);
 					}
 				} else if ("weatherCode".equals(type)) {
 					// 处理服务器返回的天气信息
@@ -157,7 +184,22 @@ public class WeatherActivity extends Activity implements OnClickListener {
 		currentDateText.setText(prefs.getString("current_date", ""));
 		weatherInfoLayout.setVisibility(View.VISIBLE);
 		cityNameText.setVisibility(View.VISIBLE);
-		Intent intent = new Intent(this, AutoUpdateService.class); 
+		Intent intent = new Intent(this, AutoUpdateService.class);
 		startService(intent);
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK) {
+			if ((System.currentTimeMillis() - mExitTime) > 2000) {
+				// Object mHelperUtils;
+				Toast.makeText(this, "再按一次退出程序", Toast.LENGTH_SHORT).show();
+				mExitTime = System.currentTimeMillis();
+			} else {
+				finish();
+			}
+			return true;
+		}
+		return super.onKeyDown(keyCode, event);
 	}
 }

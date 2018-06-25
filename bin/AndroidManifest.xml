@@ -16,7 +16,7 @@
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
         <activity
-            android:name="com.onemi6.app.activity.ChooseAreaActivity"
+            android:name=".activity.WeatherActivity"
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,13 +24,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.onemi6.app.activity.WeatherActivity" >
+        <activity android:name=".activity.ChooseAreaActivity" >
+        </activity>
+        <activity android:name=".activity.CountyListActivity" >
         </activity>
 
-        <service android:name="com.onemi6.app.service.AutoUpdateService" >
+        <service android:name=".service.AutoUpdateService" >
         </service>
 
-        <receiver android:name="com.onemi6.app.receiver.AutoUpdateReceiver" >
+        <receiver android:name=".receiver.AutoUpdateReceiver" >
         </receiver>
     </application>
 
